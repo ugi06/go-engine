@@ -73,17 +73,17 @@ class GoEngine:
             self.moves = [m for m in self.moves if m['pos'] not in group]
 
     def get_analysis_data(self):
-        # IŞIN GEOMETRİSİ (Sadece Görsel ve Alan İçin - Patlamaya sebep olmaz)
+        # IŞIN GEOMETRİSİ
         rays = []
         for i, m in enumerate(self.moves):
             mx, my = float(m['pos'][0]), float(m['pos'][1])
             dirs = []
             if self.mode == "BARRIER": dirs = [(0,1),(0,-1),(1,0),(-1,0)]
             elif self.mode == "DIAGONAL": dirs = [(1,1),(1,-1),(-1,1),(-1,-1)]
-            elif self.mode == "SUPER_RAY": dirs = [(0,1),(0,-1),(1,0),(-1,0), (1,1),(1,-1),(-1,1),(-1,-1)]
             
             for d_idx, (dx, dy) in enumerate(dirs):
-                dist = self._get_bound(mx, my, dx, dy)
+                # DEĞİŞİM BURADA: Işın kendi rengindeki taşa çarpana kadar gider
+                dist = self._get_ray_limit(mx, my, dx, dy)
                 rays.append({'start': (mx, my), 'dir': (dx, dy), 'color': m['color'], 'limit': dist})
 
         cand = []
@@ -133,8 +133,28 @@ class GoEngine:
         return t1, t2, (x1+v1x*t1, y1+v1y*t1)
     
     def toggle_mode(self):
-        modes = ["BARRIER", "DIAGONAL", "SUPER_RAY"]
+        modes = ["BARRIER", "DIAGONAL"]
         # Mevcut modun listedeki yerini bul ve bir sonrakine geç
         current_idx = modes.index(self.mode)
         self.mode = modes[(current_idx + 1) % len(modes)]
         print(f"Mod Değiştirildi: {self.mode}") # Terminalden takip etmek için
+
+    def _get_ray_limit(self, x, y, dx, dy):
+        """Işının gidebileceği maksimum mesafeyi (tahta sınırı veya HERHANGİ BİR taş) hesaplar."""
+        limit = self._get_bound(x, y, dx, dy)
+        
+        for m in self.moves:
+            # Taşı kendisiyle kıyaslama
+            if m['pos'] != (x, y):
+                ox, oy = float(m['pos'][0]), float(m['pos'][1])
+                vx, vy = ox - x, oy - y
+                
+                # Işın yönü ile taş aynı hizada mı?
+                if abs(vx * dy - vy * dx) < 0.001:
+                    dot = vx * dx + vy * dy
+                    if dot > 0: # Işın direkt bu taşa doğru mu gidiyor?
+                        dist = math.sqrt(vx**2 + vy**2)
+                        if dist < limit:
+                            # Renk ne olursa olsun, ışın taşın içinden geçemez!
+                            limit = dist 
+        return limit
