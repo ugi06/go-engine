@@ -6,6 +6,32 @@ class GoEngine:
         self.moves = [] 
         self.mode = "BARRIER"
         self.current_turn = "black"  # Sıra takibini buraya sabitledik
+        self.diagonal_tolerance = False
+    
+    def toggle_diagonal_tolerance(self):
+        self.diagonal_tolerance = not self.diagonal_tolerance
+        return self.diagonal_tolerance
+
+    def _get_ray_limit(self, x, y, dx, dy):
+        """Işının gidebileceği maksimum mesafeyi hesaplar."""
+        limit = self._get_bound(x, y, dx, dy)
+        
+        # Çapraz ışınlar (dx ve dy'nin ikisi de 0 değilse) için tolerans payı
+        tolerance_value = 0.1 if self.diagonal_tolerance and (dx != 0 and dy != 0) else 0.001
+
+        for m in self.moves:
+            if m['pos'] != (x, y):
+                ox, oy = float(m['pos'][0]), float(m['pos'][1])
+                vx, vy = ox - x, oy - y
+                
+                # Çapraz çarpım ile hiza kontrolü (Tolerans değeri burada devreye giriyor)
+                if abs(vx * dy - vy * dx) <= tolerance_value:
+                    dot = vx * dx + vy * dy
+                    if dot > 0:
+                        dist = math.hypot(vx, vy)
+                        if dist < limit:
+                            limit = dist 
+        return limit
 
     def add_move(self, x, y, color):
         # 1. Sıra kontrolü: Gelen renk beklenen renk mi?
@@ -80,6 +106,7 @@ class GoEngine:
             dirs = []
             if self.mode == "BARRIER": dirs = [(0,1),(0,-1),(1,0),(-1,0)]
             elif self.mode == "DIAGONAL": dirs = [(1,1),(1,-1),(-1,1),(-1,-1)]
+            elif self.mode == "SUPER_RAY": dirs = [(0,1),(0,-1),(1,0),(-1,0), (1,1),(1,-1),(-1,1),(-1,-1)]
             
             for d_idx, (dx, dy) in enumerate(dirs):
                 # DEĞİŞİM BURADA: Işın kendi rengindeki taşa çarpana kadar gider
@@ -133,28 +160,7 @@ class GoEngine:
         return t1, t2, (x1+v1x*t1, y1+v1y*t1)
     
     def toggle_mode(self):
-        modes = ["BARRIER", "DIAGONAL"]
+        modes = ["BARRIER", "DIAGONAL", "SUPER_RAY"]
         # Mevcut modun listedeki yerini bul ve bir sonrakine geç
         current_idx = modes.index(self.mode)
         self.mode = modes[(current_idx + 1) % len(modes)]
-        print(f"Mod Değiştirildi: {self.mode}") # Terminalden takip etmek için
-
-    def _get_ray_limit(self, x, y, dx, dy):
-        """Işının gidebileceği maksimum mesafeyi (tahta sınırı veya HERHANGİ BİR taş) hesaplar."""
-        limit = self._get_bound(x, y, dx, dy)
-        
-        for m in self.moves:
-            # Taşı kendisiyle kıyaslama
-            if m['pos'] != (x, y):
-                ox, oy = float(m['pos'][0]), float(m['pos'][1])
-                vx, vy = ox - x, oy - y
-                
-                # Işın yönü ile taş aynı hizada mı?
-                if abs(vx * dy - vy * dx) < 0.001:
-                    dot = vx * dx + vy * dy
-                    if dot > 0: # Işın direkt bu taşa doğru mu gidiyor?
-                        dist = math.sqrt(vx**2 + vy**2)
-                        if dist < limit:
-                            # Renk ne olursa olsun, ışın taşın içinden geçemez!
-                            limit = dist 
-        return limit
