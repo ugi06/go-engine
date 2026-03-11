@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+snapshot.png
+go_capture.png
+.DS_Store
